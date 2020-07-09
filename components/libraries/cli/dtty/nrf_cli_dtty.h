@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017 - 2020, Nordic Semiconductor ASA
+ * Copyright (c) 2017 - 2019, Nordic Semiconductor ASA
  *
  * All rights reserved.
  *
@@ -37,52 +37,63 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#ifndef NRF_CLI_DTTY_H__
+#define NRF_CLI_DTTY_H__
 
-#include "sdk_common.h"
-#if NRF_MODULE_ENABLED(NRF_LOG)
-#include "nrf_log_default_backends.h"
-#include "nrf_log_ctrl.h"
-#include "nrf_log_internal.h"
-#include "nrf_assert.h"
+#include <ubinos.h>
 
-#if defined(NRF_LOG_BACKEND_RTT_ENABLED) && NRF_LOG_BACKEND_RTT_ENABLED
-#include "nrf_log_backend_rtt.h"
-NRF_LOG_BACKEND_RTT_DEF(rtt_log_backend);
+#include "nrf_cli.h"
+#include "app_timer.h"
+#include "nordic_common.h"
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-#if defined(NRF_LOG_BACKEND_UART_ENABLED) && NRF_LOG_BACKEND_UART_ENABLED
-#include "nrf_log_backend_uart.h"
-NRF_LOG_BACKEND_UART_DEF(uart_log_backend);
-#endif
+/**@file
+ *
+ * @defgroup nrf_cli_dtty DTTY command line interface transport layer
+ * @ingroup nrf_cli
+ *
+ * @{
+ *
+ */
 
-#if defined(NRF_LOG_BACKEND_DTTY_ENABLED) && NRF_LOG_BACKEND_DTTY_ENABLED
-#include "nrf_log_backend_dtty.h"
-NRF_LOG_BACKEND_DTTY_DEF(dtty_log_backend);
-#endif
+/**
+ * @brief Command line interface transport.
+ */
+extern const nrf_cli_transport_api_t nrf_cli_dtty_transport_api;
 
-void nrf_log_default_backends_init(void)
-{
-    int32_t backend_id = -1;
-    (void)backend_id;
-#if defined(NRF_LOG_BACKEND_RTT_ENABLED) && NRF_LOG_BACKEND_RTT_ENABLED
-    nrf_log_backend_rtt_init();
-    backend_id = nrf_log_backend_add(&rtt_log_backend, NRF_LOG_SEVERITY_DEBUG);
-    ASSERT(backend_id >= 0);
-    nrf_log_backend_enable(&rtt_log_backend);
-#endif
+/**
+ * @brief CLI DTTY transport control block structure.
+ */
+typedef struct {
+    nrf_cli_transport_handler_t handler;      //!< Event handler
+    void *                      p_context;    //!< User context.
+    bool                        timer_created;//!< Flag indicating whether a timer is created.
+} nrf_cli_dtty_internal_cb_t;
 
-#if defined(NRF_LOG_BACKEND_UART_ENABLED) && NRF_LOG_BACKEND_UART_ENABLED
-    nrf_log_backend_uart_init();
-    backend_id = nrf_log_backend_add(&uart_log_backend, NRF_LOG_SEVERITY_DEBUG);
-    ASSERT(backend_id >= 0);
-    nrf_log_backend_enable(&uart_log_backend);
-#endif
+/**
+ * @brief CLI DTTY transport instance structure.
+ */
+typedef struct {
+    nrf_cli_transport_t         transport; //!< Transport structure.
+    nrf_cli_dtty_internal_cb_t * p_cb;      //!< Pointer to the instance control block.
+    app_timer_id_t const *      p_timer;   //!< Pointer to the app_timer instance.
+} nrf_cli_dtty_internal_t;
 
-#if defined(NRF_LOG_BACKEND_DTTY_ENABLED) && NRF_LOG_BACKEND_DTTY_ENABLED
-    nrf_log_backend_dtty_init();
-    backend_id = nrf_log_backend_add(&dtty_log_backend, NRF_LOG_SEVERITY_DEBUG);
-    ASSERT(backend_id >= 0);
-    nrf_log_backend_enable(&dtty_log_backend);
-#endif
+/**@brief CLI DTTY transport definition */
+#define NRF_CLI_DTTY_DEF(_name_)                             \
+    APP_TIMER_DEF(CONCAT_2(_name_, _timer));                \
+    static nrf_cli_dtty_internal_cb_t CONCAT_2(_name_, _cb); \
+    static const nrf_cli_dtty_internal_t _name_ = {          \
+        .transport = {.p_api = &nrf_cli_dtty_transport_api}, \
+        .p_cb = &CONCAT_2(_name_, _cb),                     \
+        .p_timer = &CONCAT_2(_name_, _timer)                \
+    }
+
+#ifdef __cplusplus
 }
 #endif
+
+#endif /* NRF_CLI_DTTY_H__ */

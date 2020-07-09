@@ -38,6 +38,10 @@
  *
  */
 
+#if defined(UBINOS_PRESENT)
+#include <ubinos.h>
+#endif /* defined(UBINOS_PRESENT) */
+
 #include "sdk_common.h"
 #if NRF_MODULE_ENABLED(NRF_SDH_BLE)
 
@@ -64,6 +68,9 @@ NRF_LOG_MODULE_REGISTER();
 NRF_SECTION_SET_DEF(sdh_ble_observers, nrf_sdh_ble_evt_observer_t, NRF_SDH_BLE_OBSERVER_PRIO_LEVELS);
 
 
+#if defined(UBINOS_PRESENT)
+uint32_t const * const m_ram_start = (uint32_t const * const) (UBINOS__BSP__LINK_MEMMAP_RAM_ORIGIN);
+#else /* defined(UBINOS_PRESENT) */
 //lint -save -e10 -e19 -e40 -e27 Illegal character (0x24)
 #if defined(__CC_ARM)
     extern uint32_t  Image$$RW_IRAM1$$Base;
@@ -79,6 +86,7 @@ NRF_SECTION_SET_DEF(sdh_ble_observers, nrf_sdh_ble_evt_observer_t, NRF_SDH_BLE_O
     uint32_t const * const m_ram_start = &__data_start__;
 #endif
 //lint -restore
+#endif /* defined(UBINOS_PRESENT) */
 
 #define RAM_START       0x20000000
 #define APP_RAM_START   (uint32_t)m_ram_start

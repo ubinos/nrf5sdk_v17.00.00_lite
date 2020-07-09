@@ -37,6 +37,11 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
+#if defined(UBINOS_PRESENT)
+#include <ubinos.h>
+#endif /* defined(UBINOS_PRESENT) */
+
 #include "sdk_common.h"
 #if NRF_MODULE_ENABLED(NRF_LOG)
 #include "app_util.h"
@@ -106,6 +111,15 @@ typedef struct
 
 static log_data_t   m_log_data;
 
+#if defined(UBINOS_PRESENT)
+    static mutex_pt m_log_data_mutex;
+    #define nrf_log_lock()        if (!bsp_isintr()) { mutex_lock(m_log_data_mutex); }
+    #define nrf_log_unlock()      if (!bsp_isintr()) { mutex_unlock(m_log_data_mutex); }
+#else /* defined(UBINOS_PRESENT) */
+    #define nrf_log_lock()
+    #define nrf_log_unlock()
+#endif /* defined(UBINOS_PRESENT) */
+
 NRF_LOG_MODULE_REGISTER();
 
 // Helper macros for section variables.
@@ -117,6 +131,10 @@ NRF_LOG_MODULE_REGISTER();
 
 ret_code_t nrf_log_init(nrf_log_timestamp_func_t timestamp_func, uint32_t timestamp_freq)
 {
+#if defined(UBINOS_PRESENT)
+    mutex_create(&m_log_data_mutex);
+#endif /* defined(UBINOS_PRESENT) */
+
     (void)NRF_LOG_ITEM_DATA_CONST(app);
 
     if (NRF_LOG_USES_TIMESTAMP && (timestamp_func == NULL))
@@ -269,6 +287,8 @@ static uint16_t higher_lvl_get(uint32_t lvls)
 
 void nrf_log_module_filter_set(uint32_t backend_id, uint32_t module_id, nrf_log_severity_t severity)
 {
+    nrf_log_lock();
+
     if (NRF_LOG_FILTERS_ENABLED)
     {
         nrf_log_module_dynamic_data_t * p_module_data = NRF_LOG_DYNAMIC_SECTION_VARS_GET(module_id);
@@ -279,13 +299,20 @@ void nrf_log_module_filter_set(uint32_t backend_id, uint32_t module_id, nrf_log_
 
         p_module_data->filter = higher_lvl_get(p_filter->filter_lvls);
     }
+
+    nrf_log_unlock();
 }
 
 static nrf_log_severity_t nrf_log_module_init_filter_get(uint32_t module_id)
 {
+    nrf_log_lock();
+
     nrf_log_module_const_data_t * p_module_data =
                                         NRF_LOG_CONST_SECTION_VARS_GET(module_id);
-    return NRF_LOG_FILTERS_ENABLED ? p_module_data->initial_lvl : p_module_data->compiled_lvl;
+    nrf_log_severity_t retval = NRF_LOG_FILTERS_ENABLED ? p_module_data->initial_lvl : p_module_data->compiled_lvl;
+
+    nrf_log_unlock();
+    return retval;
 }
 
 nrf_log_severity_t nrf_log_module_filter_get(uint32_t backend_id,
@@ -293,6 +320,8 @@ nrf_log_severity_t nrf_log_module_filter_get(uint32_t backend_id,
                                              bool ordered_idx,
                                              bool dynamic)
 {
+    nrf_log_lock();
+
     nrf_log_severity_t severity = NRF_LOG_SEVERITY_NONE;
     if (NRF_LOG_FILTERS_ENABLED && dynamic)
     {
@@ -313,6 +342,8 @@ nrf_log_severity_t nrf_log_module_filter_get(uint32_t backend_id,
             severity = (nrf_log_severity_t)p_module_data->compiled_lvl;
         }
     }
+
+    nrf_log_unlock();
     return severity;
 }
 /**
@@ -504,8 +535,11 @@ static inline bool buf_prealloc(uint32_t content_len, uint32_t * p_wr_idx, bool 
 
 char const * nrf_log_push(char * const p_str)
 {
+    nrf_log_lock();
+
     if ((m_log_data.autoflush) || (p_str == NULL))
     {
+        nrf_log_unlock();
         return p_str;
     }
 
@@ -531,10 +565,12 @@ char const * nrf_log_push(char * const p_str)
         err = nrf_ringbuf_free(&m_log_push_ringbuf, ssize);
         ASSERT(err == NRF_SUCCESS);
 
+        nrf_log_unlock();
         return (char const *)p_dst;
     }
     else
     {
+        nrf_log_unlock();
         return NULL;
     }
 }
@@ -544,6 +580,8 @@ static inline void std_n(uint32_t           severity_mid,
                          uint32_t const *   args,
                          uint32_t           nargs)
 {
+    nrf_log_lock();
+
     uint32_t mask   = m_buffer_mask;
     uint32_t wr_idx;
 
@@ -572,6 +610,7 @@ static inline void std_n(uint32_t           severity_mid,
 #endif // NRF_LOG_NON_DEFFERED_CRITICAL_REGION_ENABLED
     }
 
+    nrf_log_unlock();
 }
 
 void nrf_log_frontend_std_0(uint32_t severity_mid, char const * const p_str)
@@ -653,6 +692,8 @@ void nrf_log_frontend_hexdump(uint32_t           severity_mid,
                               const void * const p_data,
                               uint16_t           length)
 {
+    nrf_log_lock();
+
     uint32_t mask   = m_buffer_mask;
 
     uint32_t wr_idx;
@@ -705,6 +746,8 @@ void nrf_log_frontend_hexdump(uint32_t           severity_mid,
         CRITICAL_REGION_EXIT();
 #endif // NRF_LOG_NON_DEFFERED_CRITICAL_REGION_ENABLED
     }
+
+    nrf_log_unlock();
 }
 
 
@@ -715,9 +758,11 @@ bool buffer_is_empty(void)
 
 bool nrf_log_frontend_dequeue(void)
 {
+    nrf_log_lock();
 
     if (buffer_is_empty())
     {
+        nrf_log_unlock();
         return false;
     }
     m_log_data.log_skipped      = 0;
@@ -739,6 +784,7 @@ bool nrf_log_frontend_dequeue(void)
             if (rd_idx >= m_log_data.wr_idx)
             {
                 m_log_data.rd_idx     = m_log_data.wr_idx;
+                nrf_log_unlock();
                 return false;
             }
             //something was omitted. Point to new header and try again.
@@ -904,7 +950,9 @@ bool nrf_log_frontend_dequeue(void)
         NRF_LOG_WARNING("Backends flushed");
     }
 
-    return buffer_is_empty() ? false : true;
+    bool retval = buffer_is_empty() ? false : true;
+    nrf_log_unlock();
+    return retval;
 }
 
 static int32_t backend_id_assign(void)
@@ -935,9 +983,12 @@ static int32_t backend_id_assign(void)
 
 int32_t nrf_log_backend_add(nrf_log_backend_t const * p_backend, nrf_log_severity_t severity)
 {
+    nrf_log_lock();
+
     int32_t id = backend_id_assign();
     if (id == -1)
     {
+        nrf_log_unlock();
         return id;
     }
 
@@ -965,11 +1016,14 @@ int32_t nrf_log_backend_add(nrf_log_backend_t const * p_backend, nrf_log_severit
         }
     }
 
+    nrf_log_unlock();
     return id;
 }
 
 void nrf_log_backend_remove(nrf_log_backend_t const * p_backend)
 {
+    nrf_log_lock();
+
     nrf_log_backend_t const * p_curr = m_log_data.p_backend_head;
     nrf_log_backend_t const * p_prev = NULL;
     while (p_curr != p_backend)
@@ -988,10 +1042,14 @@ void nrf_log_backend_remove(nrf_log_backend_t const * p_backend)
     }
 
     p_backend->p_cb->id = NRF_LOG_BACKEND_INVALID_ID;
+
+    nrf_log_unlock();
 }
 
 void nrf_log_panic(void)
 {
+    nrf_log_lock();
+
     nrf_log_backend_t const * p_backend = m_log_data.p_backend_head;
     m_log_data.autoflush = true;
     while (p_backend)
@@ -1000,6 +1058,8 @@ void nrf_log_panic(void)
         nrf_log_backend_panic_set(p_backend);
         p_backend = p_backend->p_cb->p_next;
     }
+
+    nrf_log_unlock();
 }
 
 #if NRF_MODULE_ENABLED(LOG_CONFIG_LOAD_STORE)
@@ -1009,6 +1069,8 @@ void nrf_log_panic(void)
 
 ret_code_t nrf_log_config_store(void)
 {
+    nrf_log_lock();
+
     fds_record_desc_t desc = {0};
     fds_find_token_t  token = {0};
     fds_record_t      record = {
@@ -1034,11 +1096,15 @@ ret_code_t nrf_log_config_store(void)
     {
         ret = NRF_ERROR_INTERNAL;
     }
+
+    nrf_log_unlock();
     return ret;
 }
 
 ret_code_t nrf_log_config_load(void)
 {
+    nrf_log_lock();
+
     fds_record_desc_t desc = {0};
     fds_find_token_t  token = {0};
 
@@ -1065,6 +1131,7 @@ ret_code_t nrf_log_config_load(void)
         ret = NRF_ERROR_INTERNAL;
     }
 
+    nrf_log_unlock();
     return ret;
 }
 #endif //LOG_CONFIG_LOAD_STORE_ENABLED
