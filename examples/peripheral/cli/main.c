@@ -70,30 +70,29 @@
 #include "nrf_mpu_lib.h"
 #include "nrf_stack_guard.h"
 
-#if defined(APP_USBD_ENABLED) && APP_USBD_ENABLED
-    #define CLI_OVER_USB_CDC_ACM 1
-    #define CLI_OVER_RTT 0
-    #define CLI_OVER_DTTY 0
-    #define CLI_OVER_UART 0
-#elif (UBINOS__BSP__USE_DTTY == 1)
+#if (UBINOS__BSP__USE_DTTY == 1)
+    #define CLI_OVER_DTTY 1
     #define CLI_OVER_USB_CDC_ACM 0
     #define CLI_OVER_RTT 0
-    #define CLI_OVER_DTTY 1
+    #define CLI_OVER_UART 0
+#elif defined(APP_USBD_ENABLED) && APP_USBD_ENABLED
+    #define CLI_OVER_DTTY 0
+    #define CLI_OVER_USB_CDC_ACM 1
     #define CLI_OVER_UART 0
 #elif (NRF_CLI_RTT_ENABLED == 1)
+    #define CLI_OVER_DTTY 0
     #define CLI_OVER_USB_CDC_ACM 0
     #define CLI_OVER_RTT 1
-    #define CLI_OVER_DTTY 0
     #define CLI_OVER_UART 0
 #elif defined(TX_PIN_NUMBER) && defined(RX_PIN_NUMBER)
+    #define CLI_OVER_DTTY 0
     #define CLI_OVER_USB_CDC_ACM 0
     #define CLI_OVER_RTT 0
-    #define CLI_OVER_DTTY 0
     #define CLI_OVER_UART 1
 #else
+    #define CLI_OVER_DTTY 0
     #define CLI_OVER_USB_CDC_ACM 0
     #define CLI_OVER_RTT 0
-    #define CLI_OVER_DTTY 0
     #define CLI_OVER_UART 0
 #endif
 
