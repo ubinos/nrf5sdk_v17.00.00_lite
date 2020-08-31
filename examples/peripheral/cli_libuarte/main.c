@@ -37,6 +37,10 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#if defined(UBINOS_BSP_PRESENT)
+#include <ubinos.h>
+#endif /* defined(UBINOS_BSP_PRESENT) */
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -61,9 +65,49 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
-#include "nrf_cli_libuarte.h"
-
 #include "nrf_drv_clock.h"
+
+#if (UBINOS__BSP__USE_DTTY == 1)
+    #define CLI_OVER_DTTY 1
+    #define CLI_OVER_USB_CDC_ACM 0
+    #define CLI_OVER_RTT 0
+    #define CLI_OVER_LIBUARTE 0
+    #define CLI_OVER_UART 0
+#elif defined(APP_USBD_ENABLED) && APP_USBD_ENABLED
+    #define CLI_OVER_DTTY 0
+    #define CLI_OVER_USB_CDC_ACM 1
+    #define CLI_OVER_RTT 0
+    #define CLI_OVER_LIBUARTE 0
+    #define CLI_OVER_UART 0
+#elif (NRF_CLI_RTT_ENABLED == 1)
+    #define CLI_OVER_DTTY 0
+    #define CLI_OVER_USB_CDC_ACM 0
+    #define CLI_OVER_RTT 1
+    #define CLI_OVER_LIBUARTE 0
+    #define CLI_OVER_UART 0
+#elif ((NRF_LIBUARTE_DRV_UARTE0_ENABLED == 1) || (NRF_LIBUARTE_DRV_UARTE1_ENABLED == 1))
+    #define CLI_OVER_DTTY 0
+    #define CLI_OVER_USB_CDC_ACM 0
+    #define CLI_OVER_RTT 0
+    #define CLI_OVER_LIBUARTE 1
+    #define CLI_OVER_UART 0
+#elif defined(TX_PIN_NUMBER) && defined(RX_PIN_NUMBER)
+    #define CLI_OVER_DTTY 0
+    #define CLI_OVER_USB_CDC_ACM 0
+    #define CLI_OVER_RTT 0
+    #define CLI_OVER_LIBUARTE 0
+    #define CLI_OVER_UART 1
+#else
+    #define CLI_OVER_DTTY 0
+    #define CLI_OVER_USB_CDC_ACM 0
+    #define CLI_OVER_RTT 0
+    #define CLI_OVER_LIBUARTE 0
+    #define CLI_OVER_UART 0
+#endif
+
+#if CLI_OVER_LIBUARTE
+    #include "nrf_cli_libuarte.h"
+#endif
 
 /* Counter timer. */
 APP_TIMER_DEF(m_timer_0);
@@ -74,19 +118,23 @@ static bool m_counter_active = false;
 /** @brief Command line interface instance. */
 #define CLI_EXAMPLE_LOG_QUEUE_SIZE  (4)
 
+#if CLI_OVER_LIBUARTE
 NRF_CLI_LIBUARTE_DEF(m_cli_libuarte_transport, 256, 256);
 NRF_CLI_DEF(m_cli_libuarte,
             "libuarte_cli:~$ ",
             &m_cli_libuarte_transport.transport,
             '\r',
             CLI_EXAMPLE_LOG_QUEUE_SIZE);
+#endif
 
+#if CLI_OVER_RTT
 NRF_CLI_RTT_DEF(m_cli_rtt_transport);
 NRF_CLI_DEF(m_cli_rtt,
             "rtt_cli:~$ ",
             &m_cli_rtt_transport.transport,
             '\n',
             CLI_EXAMPLE_LOG_QUEUE_SIZE);
+#endif
 
 static void timer_handle(void * p_context)
 {
@@ -103,17 +151,22 @@ static void cli_start(void)
 {
     ret_code_t ret;
 
+#if CLI_OVER_LIBUARTE
     ret = nrf_cli_start(&m_cli_libuarte);
     APP_ERROR_CHECK(ret);
+#endif
 
+#if CLI_OVER_RTT
     ret = nrf_cli_start(&m_cli_rtt);
     APP_ERROR_CHECK(ret);
+#endif
 }
 
 static void cli_init(void)
 {
     ret_code_t ret;
 
+#if CLI_OVER_LIBUARTE
     cli_libuarte_config_t libuarte_config;
     libuarte_config.tx_pin   = TX_PIN_NUMBER;
     libuarte_config.rx_pin   = RX_PIN_NUMBER;
@@ -122,15 +175,23 @@ static void cli_init(void)
     libuarte_config.hwfc     = NRF_UARTE_HWFC_DISABLED;
     ret = nrf_cli_init(&m_cli_libuarte, &libuarte_config, true, true, NRF_LOG_SEVERITY_INFO);
     APP_ERROR_CHECK(ret);
+#endif
 
+#if CLI_OVER_RTT
     ret = nrf_cli_init(&m_cli_rtt, NULL, true, true, NRF_LOG_SEVERITY_INFO);
     APP_ERROR_CHECK(ret);
+#endif
 }
 
 static void cli_process(void)
 {
+#if CLI_OVER_LIBUARTE
     nrf_cli_process(&m_cli_libuarte);
+#endif
+
+#if CLI_OVER_RTT
     nrf_cli_process(&m_cli_rtt);
+#endif
 }
 
 int main(void)
