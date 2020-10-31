@@ -38,10 +38,6 @@
  *
  */
 
-#if defined(UBINOS_PRESENT)
-#include <ubinos.h>
-#endif /* defined(UBINOS_PRESENT) */
-
 #include <nrfx.h>
 
 #if NRFX_CHECK(NRFX_UARTE_ENABLED)
@@ -111,15 +107,6 @@ typedef struct
     nrfx_drv_state_t           state;
 } uarte_control_block_t;
 static uarte_control_block_t m_cb[NRFX_UARTE_ENABLED_COUNT];
-
-#if defined(UBINOS_PRESENT)
-    static mutex_pt m_nrfx_uarte_mutex;
-    #define nrfx_uarte_lock()      mutex_lock(m_nrfx_uarte_mutex)
-    #define nrfx_uarte_unlock()    mutex_unlock(m_nrfx_uarte_mutex)
-#else /* defined(UBINOS_PRESENT) */
-    #define nrfx_uarte_lock()
-    #define nrfx_uarte_unlock()
-#endif /* defined(UBINOS_PRESENT) */
 
 static void apply_config(nrfx_uarte_t        const * p_instance,
                          nrfx_uarte_config_t const * p_config)
@@ -217,10 +204,6 @@ nrfx_err_t nrfx_uarte_init(nrfx_uarte_t const *        p_instance,
                            nrfx_uarte_config_t const * p_config,
                            nrfx_uarte_event_handler_t  event_handler)
 {
-#if defined(UBINOS_PRESENT)
-    mutex_create(&m_nrfx_uarte_mutex);
-#endif /* defined(UBINOS_PRESENT) */
-
     NRFX_ASSERT(p_config);
     uarte_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
     nrfx_err_t err_code = NRFX_SUCCESS;
@@ -352,8 +335,6 @@ nrfx_err_t nrfx_uarte_tx(nrfx_uarte_t const * p_instance,
                          uint8_t const *      p_data,
                          size_t               length)
 {
-    nrfx_uarte_lock();
-
     uarte_control_block_t * p_cb = &m_cb[p_instance->drv_inst_idx];
     NRFX_ASSERT(p_cb->state == NRFX_DRV_STATE_INITIALIZED);
     NRFX_ASSERT(p_data);
@@ -370,29 +351,15 @@ nrfx_err_t nrfx_uarte_tx(nrfx_uarte_t const * p_instance,
         NRFX_LOG_WARNING("Function: %s, error code: %s.",
                          __func__,
                          NRFX_LOG_ERROR_STRING_GET(err_code));
-        nrfx_uarte_unlock();
         return err_code;
     }
 
-#if defined(UBINOS_PRESENT)
-    bool in_progress = true;
-    for (int i = 0; i < 60000; i++) {
-        in_progress = nrfx_uarte_tx_in_progress(p_instance);
-        if (!in_progress) {
-            break;
-        }
-        task_sleepms(1);
-    }
-    if (in_progress)
-#else /* defined(UBINOS_PRESENT) */
     if (nrfx_uarte_tx_in_progress(p_instance))
-#endif /* defined(UBINOS_PRESENT) */
     {
         err_code = NRFX_ERROR_BUSY;
         NRFX_LOG_WARNING("Function: %s, error code: %s.",
                          __func__,
                          NRFX_LOG_ERROR_STRING_GET(err_code));
-        nrfx_uarte_unlock();
         return err_code;
     }
     p_cb->tx_buffer_length = length;
@@ -438,7 +405,6 @@ nrfx_err_t nrfx_uarte_tx(nrfx_uarte_t const * p_instance,
     }
 
     NRFX_LOG_INFO("Function: %s, error code: %s.", __func__, NRFX_LOG_ERROR_STRING_GET(err_code));
-    nrfx_uarte_unlock();
     return err_code;
 }
 
