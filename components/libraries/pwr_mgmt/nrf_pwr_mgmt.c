@@ -321,8 +321,20 @@ static nrf_section_iter_t   m_handlers_iter;    /**< Shutdown handlers iterator.
     #define PWR_MGMT_TIMER_CREATE() NRF_SUCCESS
 #endif // PWR_MGMT_TIMER_REQUIRED
 
+#if defined(UBINOS_PRESENT)
+    static uint8_t m_pwr_mgmt_initiated = 0;
+#endif /* defined(UBINOS_PRESENT) */
+
 ret_code_t nrf_pwr_mgmt_init(void)
 {
+#if defined(UBINOS_PRESENT)
+    if (m_pwr_mgmt_initiated)
+    {
+        return NRF_SUCCESS;
+    }
+    m_pwr_mgmt_initiated = 1;
+#endif /* defined(UBINOS_PRESENT) */
+
     NRF_LOG_INFO("Init");
 
     m_shutdown_started = false;

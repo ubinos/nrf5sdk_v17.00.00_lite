@@ -45,6 +45,10 @@
 #include "nrf_log_internal.h"
 #include "nrf_assert.h"
 
+#if defined(UBINOS_PRESENT)
+static uint8_t m_log_default_backends_initiated = 0;
+#endif /* defined(UBINOS_PRESENT) */
+
 #if defined(NRF_LOG_BACKEND_RTT_ENABLED) && NRF_LOG_BACKEND_RTT_ENABLED
 #include "nrf_log_backend_rtt.h"
 NRF_LOG_BACKEND_RTT_DEF(rtt_log_backend);
@@ -62,6 +66,14 @@ NRF_LOG_BACKEND_DTTY_DEF(dtty_log_backend);
 
 void nrf_log_default_backends_init(void)
 {
+#if defined(UBINOS_PRESENT)
+    if (m_log_default_backends_initiated)
+    {
+        return;
+    }
+    m_log_default_backends_initiated = 1;
+#endif /* defined(UBINOS_PRESENT) */
+
     int32_t backend_id = -1;
     (void)backend_id;
 #if defined(NRF_LOG_BACKEND_RTT_ENABLED) && NRF_LOG_BACKEND_RTT_ENABLED

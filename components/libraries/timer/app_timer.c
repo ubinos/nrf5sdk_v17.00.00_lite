@@ -156,6 +156,10 @@ static bool                          m_rtc1_reset;                              
 static uint8_t                       m_max_user_op_queue_utilization;           /**< Maximum observed timer user operations queue utilization. */
 #endif
 
+#if defined(UBINOS_PRESENT)
+static uint8_t m_app_timer_initiated = 0;
+#endif /* defined(UBINOS_PRESENT) */
+
 /**@brief Function for initializing the RTC1 counter.
  *
  * @param[in] prescaler   Value of the RTC1 PRESCALER register. Set to 0 for no prescaling.
@@ -930,6 +934,14 @@ void SWI_IRQHandler(void)
 
 ret_code_t app_timer_init(void)
 {
+#if defined(UBINOS_PRESENT)
+    if (m_app_timer_initiated)
+    {
+        return NRF_SUCCESS;
+    }
+    m_app_timer_initiated = 1;
+#endif /* defined(UBINOS_PRESENT) */
+
     // Stop RTC to prevent any running timers from expiring (in case of reinitialization)
     rtc1_stop();
 

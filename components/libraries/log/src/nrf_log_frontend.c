@@ -112,6 +112,7 @@ typedef struct
 static log_data_t   m_log_data;
 
 #if defined(UBINOS_PRESENT)
+    static uint8_t m_log_initiated = 0;
     static mutex_pt m_log_data_mutex;
     #define nrf_log_lock()        if (!bsp_isintr()) { mutex_lock(m_log_data_mutex); }
     #define nrf_log_unlock()      if (!bsp_isintr()) { mutex_unlock(m_log_data_mutex); }
@@ -132,7 +133,12 @@ NRF_LOG_MODULE_REGISTER();
 ret_code_t nrf_log_init(nrf_log_timestamp_func_t timestamp_func, uint32_t timestamp_freq)
 {
 #if defined(UBINOS_PRESENT)
+    if (m_log_initiated)
+    {
+        return NRF_SUCCESS;
+    }
     mutex_create(&m_log_data_mutex);
+    m_log_initiated = 1;
 #endif /* defined(UBINOS_PRESENT) */
 
     (void)NRF_LOG_ITEM_DATA_CONST(app);
